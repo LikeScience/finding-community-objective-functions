@@ -1,6 +1,4 @@
 %clear all
-%Cobra Toolbox v3.33
-%MMT 2.0
 initCobraToolbox
 
 %% Load model created in MIMECO
@@ -43,92 +41,7 @@ function [simIdx, exportData, objL1, objL0, objBase] = runinvFBA(fba_sol, paired
     exportData(3:end, c:c+3) = num2cell([fba_sol(:), objBase(:), objL1(:), objL0(:)]);
 end
 
-%% Compare obtained fluxes/objs with fluxes/objs from single reaction/metabolite objective 
-function [allFluxes, A] = computeFBAs(model, loadFile, filename)
-    if nargin > 1 && loadFile && isfile(filename)
-        load(filename, 'allFluxes', 'A');
-        return;
-    end
-    A = [speye(size(model.S, 2)), -speye(size(model.S, 2)), (model.S ./ sum(abs(model.S), 2))', -(model.S ./ sum(abs(model.S), 2))'];
-    allFluxes = NaN(size(model.S, 2), size(A, 2));
-    
-    for i = 1:size(A, 2)
-        fprintf('Iteration %d / %d\n', i, size(A, 2));
-        
-        model.c = A(:, i);
-        sol = optimizeCbModel(model, 'max', 'one');
-        
-        if sol.stat == 1 && ~isempty(sol.x)
-            allFluxes(:, i) = sol.x;
-        end
-    end
-    save(filename, 'allFluxes', 'A');
-end
-
-function [maxDist, matches] = compareFluxes(model, refObjs, allFluxes, A, tol)
-    numRefs = size(refObjs, 2);
-    numFBAs = size(allFluxes, 2);
-    refFluxes = NaN(size(model.S, 2), numRefs);
-    
-    for j = 1:numRefs
-        model.c = refObjs(:, j);
-        sol = optimizeCbModel(model, 'max', 'one');
-        if sol.stat == 1 && ~isempty(sol.x)
-            refFluxes(:, j) = sol.x;
-        end
-    end
-    
-    maxDist = NaN(numFBAs, numRefs);
-    matches = cell(1, numRefs);
-    
-    for j = 1:numRefs
-        maxDist(:, j) = max(abs(allFluxes - refFluxes(:, j)), [], 1)';
-        match_idx = find(maxDist(:, j) < tol);
-        
-        matches{j} = cell(length(match_idx), 1);
-        for k = 1:length(match_idx)
-            matches{j}{k} = model.rxns(A(:, match_idx(k)) ~= 0);
-        end
-    end
-end
-
-function [diffVals, matches] = compareObjectives(model, refObjs, allFluxes, A, tol, ignoreZeroObj)
-    if nargin < 6, ignoreZeroObj = false; end
-    numRefs = size(refObjs, 2);
-    numObjs = size(A, 2);
-    numRxns = size(model.S, 2);
-    numMets = size(model.S, 1);
-    
-    refFluxes = NaN(numRxns, numRefs);
-    for j = 1:numRefs
-        model.c = refObjs(:, j);
-        sol = optimizeCbModel(model, 'max', 'one');
-        if sol.stat == 1 && ~isempty(sol.x)
-            refFluxes(:, j) = sol.x;
-        end
-    end
-    
-    diffVals = NaN(numRefs, numObjs);
-    matches = cell(1, numRefs);
-    allObjVals = sum(A .* allFluxes, 1);
-    
-    for j = 1:numRefs
-        diffVals(j, :) = allObjVals - (A' * refFluxes(:, j))';
-        match_idx = find(abs(diffVals(j, :)) < tol & (~ignoreZeroObj | allObjVals ~= 0));
-        
-        matches{j} = cell(length(match_idx), 1);
-        for k = 1:length(match_idx)
-            idx = match_idx(k);
-            if idx <= 2 * numRxns
-                matches{j}{k} = model.rxns{mod(idx - 1, numRxns) + 1};
-            else
-                matches{j}{k} = model.mets{mod(idx - 2 * numRxns - 1, numMets) + 1};
-            end
-        end
-    end
-end
-
-%Function to generate presentable flux plots
+%% Function to generate presentable flux plots
 function generateFluxPlots(pairedModel, objs, sol, labels, label, short_label)
     figWidth = 12; 
     figHeight = 12;
@@ -286,7 +199,7 @@ min_coef_val = -1000; % (No restriction)
 % forget to save all you open excel files before running this block.
 system('taskkill /F /IM excel.exe');
 
-excelFileName = 'lacto_akker_invFBA_OVA_results_poster_BioATPM.xlsx';
+excelFileName = 'lacto_akker_invFBA_OVA_results_BioATPM.xlsx';
 
 writecell(exportData, excelFileName);
 pause(1); % Sync I/O buffer

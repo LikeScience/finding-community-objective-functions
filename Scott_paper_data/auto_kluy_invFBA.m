@@ -1,6 +1,4 @@
 %clear all
-%Cobra Toolbox v3.33
-%MMT 2.0
 initCobraToolbox
 
 %% Create community model
@@ -28,14 +26,14 @@ end
 pairedModel=changeRxnBounds(pairedModel, 'EX_CO[u]', -4.8, 'l'); %Define CO uptake rate (mmol/h)
 % pairedModel=changeRxnBounds(pairedModel, 'EX_CO[u]', -0.5, 'l'); %Define CO uptake rate (mmol/h)
 % pairedModel=changeRxnBounds(pairedModel, 'EX_CO[u]', -0.073, 'l'); %Define CO uptake rate (mmol/h)
-pairedModel=changeRxnBounds(pairedModel, 'auto_BIOt', 0.021*0.22*0.4, 'u'); %Fixed flux through biomass reactions (growth rate* biomass of each species)
-pairedModel=changeRxnBounds(pairedModel, 'kluy_BIOt',0.021*0.22*0.6, 'u');
+% pairedModel=changeRxnBounds(pairedModel, 'auto_BIOt', 0.021*0.22*0.4, 'u'); %Fixed flux through biomass reactions (growth rate* biomass of each species)
+% pairedModel=changeRxnBounds(pairedModel, 'kluy_BIOt',0.021*0.22*0.6, 'u');
 % pairedModel=changeRxnBounds(pairedModel, 'auto_BIOt',0.02,'u')
 % pairedModel=changeRxnBounds(pairedModel, 'kluy_BIOt',0.5,'u')
 %pairedModel=changeRxnBounds(pairedModel, 'auto_atpm', 8.4*0.22*0.4, 'l');%ATP maintenance flux scaled to mmol/h. Infeasible
 %pairedModel=changeRxnBounds(pairedModel, 'kluy_Rckl725',0.45*0.22*0.6, 'l');
 save([pwd filesep 'model_folder' filesep  'pairedModel_auto_kluy.mat'],'pairedModel') %This saves the community model with the added constraints
-
+% pairedModel = changeRxnBounds(pairedModel,'EX_GABA[u]',-0,'l');
 %% Run simulatePairwiseInteractions
 
 modPath=[pwd filesep 'model_folder'];
@@ -249,8 +247,8 @@ r_idx = [961,2071];
 
 %% Run invFBA - joint, biomass (0.5, 0.5), no zeroing of reactions with small flux
 
-% Objective
-
+changeCobraSolverParams('LP', 'feasTol', 1e-5);
+changeCobraSolverParams('LP', 'optTol', 1e-5);
 pairedModel = changeObjective(pairedModel, {'auto_BIOt', 'kluy_BIOt'}, [0.5, 0.5]);
 disp([num2cell(find(pairedModel.c(:))), pairedModel.rxns(find(pairedModel.c(:))), num2cell(pairedModel.c(find(pairedModel.c(:))))])
 
@@ -276,8 +274,8 @@ generateFluxPlots(pairedModel, objs, sol, labels, label, short_label)
 
 %% Run invFBA - joint, biomass (0.5, 0.5)
 
-% Objective
-
+changeCobraSolverParams('LP', 'feasTol', 1e-5);
+changeCobraSolverParams('LP', 'optTol', 1e-5);
 pairedModel = changeObjective(pairedModel, {'auto_BIOt', 'kluy_BIOt'}, [0.5, 0.5]);
 disp([num2cell(find(pairedModel.c(:))), pairedModel.rxns(find(pairedModel.c(:))), num2cell(pairedModel.c(find(pairedModel.c(:))))])
 
@@ -303,8 +301,8 @@ generateFluxPlots(pairedModel, objs, sol, labels, label, short_label)
 
 %% Run invFBA - joint, biomass (0.5, 0.5)
 
-% Objective
-
+changeCobraSolverParams('LP', 'feasTol', 1e-5);
+changeCobraSolverParams('LP', 'optTol', 1e-5);
 pairedModel = changeObjective(pairedModel, {'auto_BIOt', 'kluy_BIOt'}, [0.5, 0.5]);
 disp([num2cell(find(pairedModel.c(:))), pairedModel.rxns(find(pairedModel.c(:))), num2cell(pairedModel.c(find(pairedModel.c(:))))])
 
@@ -324,8 +322,8 @@ generateFluxPlots(pairedModel, objs, sol, labels, label, short_label)
 
 %% Run invFBA - joint, biomass (1, 0)
 
-% Objective
-
+changeCobraSolverParams('LP', 'feasTol', 1e-5);
+changeCobraSolverParams('LP', 'optTol', 1e-5);
 pairedModel = changeObjective(pairedModel, {'auto_BIOt', 'kluy_BIOt'}, [1, 0]);
 disp([num2cell(find(pairedModel.c(:))), pairedModel.rxns(find(pairedModel.c(:))), num2cell(pairedModel.c(find(pairedModel.c(:))))])
 
@@ -353,7 +351,8 @@ end
 
 %% Run invFBA - joint, biomass (0.7, 0.3)
 
-% Objective
+changeCobraSolverParams('LP', 'feasTol', 1e-5);
+changeCobraSolverParams('LP', 'optTol', 1e-5);
 
 pairedModel = changeObjective(pairedModel, {'auto_BIOt', 'kluy_BIOt'}, [0.7, 0.3]);
 disp([num2cell(find(pairedModel.c(:))), pairedModel.rxns(find(pairedModel.c(:))), num2cell(pairedModel.c(find(pairedModel.c(:))))])
@@ -375,7 +374,8 @@ zeroArr = zeros(size(targetIdx));
 
 %% Run invFBA - joint, biomass (0.3, 0.7)
 
-% Objective
+changeCobraSolverParams('LP', 'feasTol', 1e-5);
+changeCobraSolverParams('LP', 'optTol', 1e-5);
 
 pairedModel = changeObjective(pairedModel, {'auto_BIOt', 'kluy_BIOt'}, [.3, .7]);
 disp([num2cell(find(pairedModel.c(:))), pairedModel.rxns(find(pairedModel.c(:))), num2cell(pairedModel.c(find(pairedModel.c(:))))])
@@ -394,7 +394,8 @@ zeroArr = zeros(size(targetIdx));
 [simIdx, exportData] = runinvFBA(sol, pairedModel, zeroArr, targetIdx, 'Joint, biomass, (0.3,0.7) only exchanges/biomass, zeoring', simIdx, exportData, true);
 %% Run invFBA - joint, biomass (0, 1)
 
-% Objective
+changeCobraSolverParams('LP', 'feasTol', 1e-5);
+changeCobraSolverParams('LP', 'optTol', 1e-5);
 
 pairedModel = changeObjective(pairedModel, {'auto_BIOt', 'kluy_BIOt'}, [0,1]);
 disp([num2cell(find(pairedModel.c(:))), pairedModel.rxns(find(pairedModel.c(:))), num2cell(pairedModel.c(find(pairedModel.c(:))))])

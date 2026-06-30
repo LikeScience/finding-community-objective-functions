@@ -1,6 +1,4 @@
 %clear all
-%Cobra Toolbox v3.33
-%MMT 2.0
 initCobraToolbox
 
 %% Load model created in MIMECO
@@ -44,90 +42,6 @@ function [simIdx, exportData, objL1, objL0, objBase] = runinvFBA(fba_sol, paired
 end
 
 %% Compare obtained fluxes/objs with fluxes/objs from single reaction/metabolite objective 
-function [allFluxes, A] = computeFBAs(model, loadFile, filename)
-    if nargin > 1 && loadFile && isfile(filename)
-        load(filename, 'allFluxes', 'A');
-        return;
-    end
-    A = [speye(size(model.S, 2)), -speye(size(model.S, 2)), (model.S ./ sum(abs(model.S), 2))', -(model.S ./ sum(abs(model.S), 2))'];
-    allFluxes = NaN(size(model.S, 2), size(A, 2));
-    
-    for i = 1:size(A, 2)
-        fprintf('Iteration %d / %d\n', i, size(A, 2));
-        
-        model.c = A(:, i);
-        sol = optimizeCbModel(model, 'max', 'one');
-        
-        if sol.stat == 1 && ~isempty(sol.x)
-            allFluxes(:, i) = sol.x;
-        end
-    end
-    save(filename, 'allFluxes', 'A');
-end
-
-function [maxDist, matches] = compareFluxes(model, refObjs, allFluxes, A, tol)
-    numRefs = size(refObjs, 2);
-    numFBAs = size(allFluxes, 2);
-    refFluxes = NaN(size(model.S, 2), numRefs);
-    
-    for j = 1:numRefs
-        model.c = refObjs(:, j);
-        sol = optimizeCbModel(model, 'max', 'one');
-        if sol.stat == 1 && ~isempty(sol.x)
-            refFluxes(:, j) = sol.x;
-        end
-    end
-    
-    maxDist = NaN(numFBAs, numRefs);
-    matches = cell(1, numRefs);
-    
-    for j = 1:numRefs
-        maxDist(:, j) = max(abs(allFluxes - refFluxes(:, j)), [], 1)';
-        match_idx = find(maxDist(:, j) < tol);
-        
-        matches{j} = cell(length(match_idx), 1);
-        for k = 1:length(match_idx)
-            matches{j}{k} = model.rxns(A(:, match_idx(k)) ~= 0);
-        end
-    end
-end
-
-function [diffVals, matches] = compareObjectives(model, refObjs, allFluxes, A, tol, ignoreZeroObj)
-    if nargin < 6, ignoreZeroObj = false; end
-    numRefs = size(refObjs, 2);
-    numObjs = size(A, 2);
-    numRxns = size(model.S, 2);
-    numMets = size(model.S, 1);
-    
-    refFluxes = NaN(numRxns, numRefs);
-    for j = 1:numRefs
-        model.c = refObjs(:, j);
-        sol = optimizeCbModel(model, 'max', 'one');
-        if sol.stat == 1 && ~isempty(sol.x)
-            refFluxes(:, j) = sol.x;
-        end
-    end
-    
-    diffVals = NaN(numRefs, numObjs);
-    matches = cell(1, numRefs);
-    allObjVals = sum(A .* allFluxes, 1);
-    
-    for j = 1:numRefs
-        diffVals(j, :) = allObjVals - (A' * refFluxes(:, j))';
-        match_idx = find(abs(diffVals(j, :)) < tol & (~ignoreZeroObj | allObjVals ~= 0));
-        
-        matches{j} = cell(length(match_idx), 1);
-        for k = 1:length(match_idx)
-            idx = match_idx(k);
-            if idx <= 2 * numRxns
-                matches{j}{k} = model.rxns{mod(idx - 1, numRxns) + 1};
-            else
-                matches{j}{k} = model.mets{mod(idx - 2 * numRxns - 1, numMets) + 1};
-            end
-        end
-    end
-end
-
 %Function to generate presentable flux plots
 function generateFluxPlots(pairedModel, objs, sol, labels, label, short_label)
     figWidth = 12; 
@@ -166,7 +80,7 @@ end
 %% Run invFBA - joint, biomass (0.5, 0.5)
 changeCobraSolverParams('LP', 'feasTol', 1e-5);
 changeCobraSolverParams('LP', 'optTol', 1e-5);
-% pairedModel = changeObjective(pairedModel, {'Growth:L_plantarum', 'Growth:A_muciniphila'}, [0.5, 0.5]);
+pairedModel = changeObjective(pairedModel, {'Growth:L_plantarum', 'Growth:A_muciniphila'}, [0.5, 0.5]);
 sol = optimizeCbModel(pairedModel,"max","one")
 selected_samples=sol.x;
 
@@ -177,12 +91,12 @@ else
 end
 zeroArr = zeros(size(targetIdx));
 
-label = 'Joint model, biomass objective (0.6,0.4)';
-short_label = 'Joint_biom_0.6_0.4';
+label = 'Joint model, biomass objective (0.5,0.5)';
+short_label = 'Joint_biom_0.5_0.5';
 
-% min_coef_val = -1000; % (No restriction)
+min_coef_val = -1000; % (No restriction)
 % min_coef_val = 0.01;
-% [simIdx, exportData, objL1, objL0, objBase] = runinvFBA(selected_samples, pairedModel, zeroArr, targetIdx, label, simIdx, exportData, true,0,min_coef_val);
+[simIdx, exportData, objL1, objL0, objBase] = runinvFBA(selected_samples, pairedModel, zeroArr, targetIdx, label, simIdx, exportData, true,0,min_coef_val);
 
 objs = [objL1, objL0, objBase];
 labels = {'L1','L0','Base'};
@@ -193,14 +107,14 @@ labels = {'L1','L0','Base'};
 targetIdx = find(~(abs(selected_samples) >= 1e-4));
 acceptableIdx = find((abs(selected_samples) >= 1e-4));
 min_objval = 1e-2;
-%% OVA
+%% OVA (takes time to run; if results already computed, it's recommended to load them)
 [C_lb, C_ub, objBase, flagBase, sum_eps,C_lb_full, C_ub_full] = OVA(sol.x, pairedModel.lb, pairedModel.ub, pairedModel.S, acceptableIdx,zeroArr, targetIdx,min_objval);
 %% Save
 save('OVA_target1e-4_minobj1e-2_results.mat', 'C_lb', 'C_ub', 'objBase', 'flagBase', 'sum_eps', 'C_lb_full', 'C_ub_full');
 %% Load OVA results
 load('OVA_target1e-4_minobj1e-2_results.mat')
-%%
-threshold = 0.2; 
+%% Final invFBA with filtered reactions
+threshold = 0.5; 
 meaningful_rxns = pairedModel.rxns(acceptableIdx(C_ub > threshold));
 non_meaningful_idx = setdiff(1:numel(pairedModel.rxns), acceptableIdx(C_ub > threshold));
 zeroArr_2 = zeros(size(non_meaningful_idx));
@@ -212,7 +126,7 @@ short_label = 'Joint_biom_0.5_0.5_OVA_coef0.01'
 min_coef_val = 0.01;
 [simIdx, exportData, objL1, objL0, objBase] = runinvFBA(selected_samples, pairedModel, zeroArr_2, non_meaningful_idx, label, simIdx, exportData, true,min_objval,min_coef_val);
 
-%% Try with other ratios 
+%% Plot with differnt biomass ratios 
 N_pts = 20;
 r = zeros(1, N_pts+1); y1 = zeros(1, N_pts+1); y2 = zeros(1, N_pts+1);
 
@@ -237,7 +151,7 @@ legend(ax, 'show');
 % At this point we see that above 0.5 for L_plantarum, A_muciniphila doesnt
 % grow, while with 0.5 or less, their growth doesn't vary a lot 
 
-%% Try with sampled point from Pareto Front:
+%% Try with sampled point from Pareto Front (the sample is stored in the model structure and was generated using the genereate_model_and_fluxes.ipynb script):
 
 selected_samples = cell2mat(pairedModel.fluxes(:, 2));
 
@@ -265,14 +179,14 @@ labels = {'L1','L0','Base'};
 targetIdx = find(~(abs(selected_samples) >= 1e-4));
 acceptableIdx = find((abs(selected_samples) >= 1e-4));
 min_objval = 1e-2;
-%% OVA
+%% OVA (takes time to run; if results already computed, it's recommended to load them)
 [C_lb, C_ub, objBase, flagBase, sum_eps,C_lb_full, C_ub_full] = OVA(selected_samples, pairedModel.lb, pairedModel.ub, pairedModel.S, acceptableIdx,zeroArr, targetIdx,min_objval);
 %% Save
 save('OVA_pareto_target1e-4_minobj1e-2_results.mat', 'C_lb', 'C_ub', 'objBase', 'flagBase', 'sum_eps', 'C_lb_full', 'C_ub_full');
 %% Load OVA results
 load('OVA_pareto_target1e-4_minobj1e-2_results.mat')
 
-%%
+%% Final invFBA with filtered reactions
 threshold = 0.5; 
 meaningful_rxns = pairedModel.rxns(acceptableIdx(C_ub > threshold));
 non_meaningful_idx = setdiff(1:numel(pairedModel.rxns), acceptableIdx(C_ub > threshold));
@@ -306,7 +220,7 @@ zeroArr = zeros(size(targetIdx));
 label = 'Joint model, biomass objective (0.4,0.6) min coef 0.01';
 short_label = 'Joint_biom_0.4_0.6 min coef 0.01';
 
-% min_coef_val = -1000; % (No restriction)
+min_coef_val = -1000; % (No restriction)
 % min_coef_val = 0.01;
 [simIdx, exportData, objL1, objL0, objBase] = runinvFBA(selected_samples, pairedModel, zeroArr, targetIdx, label, simIdx, exportData, true,0,min_coef_val);
 
@@ -319,13 +233,13 @@ labels = {'L1','L0','Base'};
 targetIdx = find(~(abs(selected_samples) >= 1e-4));
 acceptableIdx = find((abs(selected_samples) >= 1e-4));
 min_objval = 1e-2;
-%% OVA
+%% OVA (takes time to run; if results already computed, it's recommended to load them)
 [C_lb, C_ub, objBase, flagBase, sum_eps,C_lb_full, C_ub_full] = OVA(sol.x, pairedModel.lb, pairedModel.ub, pairedModel.S, acceptableIdx,zeroArr, targetIdx,min_objval);
 %% Save
 save('OVA_0.4_0.6_target1e-4_minobj1e-2_results.mat', 'C_lb', 'C_ub', 'objBase', 'flagBase', 'sum_eps', 'C_lb_full', 'C_ub_full');
 %% Load OVA results
 load('OVA_0.4_0.6_target1e-4_minobj1e-2_results.mat')
-%%
+%% Final invFBA with filtered reactions
 threshold = 0.5; 
 meaningful_rxns = pairedModel.rxns(acceptableIdx(C_ub > threshold));
 non_meaningful_idx = setdiff(1:numel(pairedModel.rxns), acceptableIdx(C_ub > threshold));
@@ -340,13 +254,52 @@ short_label = 'Joint_biom_0.4_0.6_OVA'
 min_coef_val = 0.01;
 [simIdx, exportData, objL1, objL0, objBase] = runinvFBA(selected_samples, pairedModel, zeroArr_2, non_meaningful_idx, label, simIdx, exportData, true,min_objval,min_coef_val);
 
+%% Run invFBA - joint, biomass (0.5, 0.5) with Enumerate optimal sols
+changeCobraSolverParams('LP', 'feasTol', 1e-5);
+changeCobraSolverParams('LP', 'optTol', 1e-5);
+pairedModel = changeObjective(pairedModel, {'Growth:L_plantarum', 'Growth:A_muciniphila'}, [0.5, 0.5]);
+sol = enumerateOptimalSolutions(pairedModel)
+%% Because it takes a lot of time to run, it is recommended to save the solutions found.
+save('enumerate_0.5B_0.5B.mat', 'sol');
+%% Select a subset of the sample solutions (invFBA is slow with too many samples).
+rng(42); 
+num_cols = size(sol.fluxes, 2);
+cols = randperm(num_cols, 5); 
+selected_samples=sol.fluxes(:, cols);
+
+if size(selected_samples,1) == numel(pairedModel.rxns)
+    targetIdx = find(all(abs(selected_samples) < 1e-4, 2));
+    % targetIdx = find(any(abs(selected_samples) < 1e-4, 2));
+else
+    targetIdx = [];
+end
+%% invFBA
+zeroArr = zeros(size(targetIdx));
+
+label = 'Joint model, biomass objective (0.5,0.5)';
+short_label = 'Joint_biom_0.5_0.5';
+
+min_coef_val = -1000; % (No restriction)
+% min_coef_val = 0.01;
+[simIdx, exportData, objL1, objL0, objBase] = runinvFBA(selected_samples, pairedModel, zeroArr, targetIdx, label, simIdx, exportData, true,0,min_coef_val);
+
+objs = [objL1, objL0, objBase];
+labels = {'L1','L0','Base'};
+
+
+%% OVA (takes time to run)
+acceptableIdx = find(~all(abs(selected_samples) < 1e-4, 2));
+min_objval = 1e-2;
+[C_lb, C_ub, objBase, flagBase, sum_eps,C_lb_full, C_ub_full] = OVA(selected_samples, pairedModel.lb, pairedModel.ub, pairedModel.S, acceptableIdx,zeroArr, targetIdx,min_objval);
+
 
 %% Export excel
 % Note for people cloning this repo from Github: this code block frequently leads to errors if Excel is open. Don't
 % forget to save all you open excel files before running this block.
 system('taskkill /F /IM excel.exe');
 
-excelFileName = 'lacto_akker_invFBA_OVA_results_poster_other_forward_data.xlsx';
+excelFileName = 'lacto_akker_invFBA_OVA_results.xlsx';
+% excelFileName = 'lacto_akker_invFBA_OVA_results_0.6A_0.4L_and_Pareto_Front.xlsx';
 
 writecell(exportData, excelFileName);
 pause(1); % Sync I/O buffer
